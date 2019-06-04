@@ -1,14 +1,18 @@
 package main
 
 import (
-    "os"
+    "context"
     "log"
     "net/http"
+    "os"
+    "os/signal"
+    "syscall"
+    
     "./handlers"
     "./version"
 )
 
-/ How to try it: PORT=8000 go run main.go
+// How to try it: PORT=8000 go run main.go
 func main() {
     log.Printf(
         "Starting the service...\ncommit: %s, build time: %s, release: %s",
@@ -29,29 +33,17 @@ func main() {
         Addr:    ":" + port,
         Handler: r,
     }
-
-    // this channel is for graceful shutdown:
-    // if we receive an error, we can send it here to notify the server to be stopped
-    shutdown := make(chan struct{}, 1)
     go func() {
-        err := srv.ListenAndServe()
-        if err != nil {
-            shutdown <- struct{}{}
-            log.Printf("%v", err)
-        }
+        log.Fatal(srv.ListenAndServe())
     }()
     log.Print("The service is ready to listen and serve.")
 
-    select {
-    case killSignal := <-interrupt:
-        switch killSignal {
-        case os.Interrupt:
-            log.Print("Got SIGINT...")
-        case syscall.SIGTERM:
-            log.Print("Got SIGTERM...")
-        }
-    case <-shutdown:
-        log.Printf("Got an error...")
+    killSignal := <-interrupt
+    switch killSignal {
+    case os.Interrupt:
+        log.Print("Got SIGINT...")
+    case syscall.SIGTERM:
+        log.Print("Got SIGTERM...")
     }
 
     log.Print("The service is shutting down...")
